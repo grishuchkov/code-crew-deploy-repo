@@ -1,67 +1,64 @@
-version: "3"
+version: '3'
+
 services:
   postgres:
-    image: postgres:11
-    networks:
-      - back
+    container_name: "postgres"
+    image: 'postgres'
     restart: always
     expose:
       - 5432
     environment:
-      POSTGRES_DB: main
+      POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres:/var/lib/postgresql/data
-      - ./docker/initpg.sh:/docker-entrypoint-initdb.d/initpg.sh
 
-  service1:
+  app:
+    container_name: "java-app"
+    restart: always
     build:
       context: ${SERVICE_1_SRC_DIR}
       dockerfile: Dockerfile
+    depends_on:
+      - postgres
+    links:
+      - postgres:postgres
     expose:
-      - 3001
+      - 8080
     environment:
-      - PG_STRING=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/service1
-      - OTHER_SERVICE=http://service2:3001
-      - VIRTUAL_HOST=${SERVICE_DOMAIN}
-      - LETSENCRYPT_HOST=${SERVICE_DOMAIN}
-      - VIRTUAL_PORT=3001
-      - PORT=3001
-    networks:
-      - back
-      - reverse-proxy
-
-  service2:
-    build:
-      context: ${SERVICE_2_SRC_DIR}
-      dockerfile: Dockerfile
-    expose:
-      - 3001
-    environment:
-      - PG_STRING=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/service2
-      - PORT=3001
+      JWT_REFRESH_SECRET: edShUTQIjFA/3+Ai0lUGcv0RmnN7Kh5ufgDd3ypXebN+B2+cuUZ446w99nUt0XBmvWaEbTsGStESonwFAVa4DsO2+yvbR1qYymbQsBFGwDHP70WjYs/tALe4fmiQy/c7h/uvkfndFLot136QOPo0jzibcreOV/1BxuQTyMgGTRRc7wHzPwGfvxujnd0myTyz2pI+FoPI4xhaOl1ZbR/GuOdeSeMDBiCtAqbDsA==
+      JWT_SIGNATURE_GENERATOR_SECRET: UaaOlcsrG2w7+rl/FN7O5GMEsviHy3bOIYq3V/PhtlYci1c4U5ITzmIos84/Ypq3Gqkcqm46q04/YMDXgCjCkDCtCqbB/EYGcCAadxWWt7nD2SLkmghiKQ99L6iP/HM4xyZqV3lD0PpN5Xq4SRBR/DwLRcbgRV17imK3pxvF8yeZMgovAg39qCsKXSGwIDWTd+imk8zPQ8cge70iCCWIa4o9PGrZTri6/PaveA==
+      MICRONAUT_DB: ${POSTGRES_DB}
+      MICRONAUT_USER: ${POSTGRES_USER}
+      MICRONAUT_PASSWORD: ${POSTGRES_PASSWORD}
     networks:
       - back
 
-
-  interface:
-    build:
+  nextjs-app:
+    image: ${NEXTJS_IMAGE}:${NEXTJS_IMAGE_VERSION}
+    build: # build if image not exist
       context: ${INTERFACE_SRC_DIR}
       dockerfile: Dockerfile
       args:
-        - SERVICE_URL=${PROTOCOL}://${SERVICE_DOMAIN}
+        DOT_ENV_PRODUCTION_FILE: ${NEXTJS_DOT_ENV_PRODUCTION_FILE}
+    environment:
+      - NEXT_PUBLIC_BASE_API_URL=${NEXT_PUBLIC_BASE_API_URL}
+      - AUTH_URL=${AUTH_URL}
     expose:
       - 3000
-    environment:
-      - VIRTUAL_HOST=${INTERFACE_DOMAIN}
-      - LETSENCRYPT_HOST=${INTERFACE_DOMAIN}
-      - VIRTUAL_PORT=3000
-      - PORT=3000
-      - SERVICE_URL=${PROTOCOL}://${SERVICE_DOMAIN}
-      - HOST=0.0.0.0
     networks:
       - reverse-proxy
+
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4:7
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports:
+      - "5050:80"
 
 networks:
   reverse-proxy:
