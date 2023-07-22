@@ -1,22 +1,9 @@
 version: '3'
 
 services:
-  postgres:
-    container_name: "postgres"
-    image: 'postgres'
-    restart: always
-    expose:
-      - 5432
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres:/var/lib/postgresql/data
 
   app:
     container_name: "java-app"
-    restart: always
     build:
       context: ${SERVICE_1_SRC_DIR}
       dockerfile: Dockerfile
@@ -24,31 +11,25 @@ services:
       - postgres
     links:
       - postgres:postgres
-    expose:
-      - 8080
+    ports:
+      - "8080:80"
     environment:
       JWT_REFRESH_SECRET: edShUTQIjFA/3+Ai0lUGcv0RmnN7Kh5ufgDd3ypXebN+B2+cuUZ446w99nUt0XBmvWaEbTsGStESonwFAVa4DsO2+yvbR1qYymbQsBFGwDHP70WjYs/tALe4fmiQy/c7h/uvkfndFLot136QOPo0jzibcreOV/1BxuQTyMgGTRRc7wHzPwGfvxujnd0myTyz2pI+FoPI4xhaOl1ZbR/GuOdeSeMDBiCtAqbDsA==
       JWT_SIGNATURE_GENERATOR_SECRET: UaaOlcsrG2w7+rl/FN7O5GMEsviHy3bOIYq3V/PhtlYci1c4U5ITzmIos84/Ypq3Gqkcqm46q04/YMDXgCjCkDCtCqbB/EYGcCAadxWWt7nD2SLkmghiKQ99L6iP/HM4xyZqV3lD0PpN5Xq4SRBR/DwLRcbgRV17imK3pxvF8yeZMgovAg39qCsKXSGwIDWTd+imk8zPQ8cge70iCCWIa4o9PGrZTri6/PaveA==
-      MICRONAUT_DB: ${POSTGRES_DB}
-      MICRONAUT_USER: ${POSTGRES_USER}
-      MICRONAUT_PASSWORD: ${POSTGRES_PASSWORD}
-    networks:
-      - back
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
-  nextjs-app:
-    image: ${NEXTJS_IMAGE}:${NEXTJS_IMAGE_VERSION}
-    build: # build if image not exist
-      context: ${INTERFACE_SRC_DIR}
-      dockerfile: Dockerfile
-      args:
-        DOT_ENV_PRODUCTION_FILE: ${NEXTJS_DOT_ENV_PRODUCTION_FILE}
+  postgres:
+    container_name: "postgres"
+    image: 'postgres'
+    restart: on-failure
+    ports:
+      - "5432:5432"
     environment:
-      - NEXT_PUBLIC_BASE_API_URL=${NEXT_PUBLIC_BASE_API_URL}
-      - AUTH_URL=${AUTH_URL}
-    expose:
-      - 3000
-    networks:
-      - reverse-proxy
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
   pgadmin:
     container_name: pgadmin
@@ -60,12 +41,23 @@ services:
     ports:
       - "5050:80"
 
-networks:
-  reverse-proxy:
-    external:
-      name: reverse-proxy
-  back:
-    driver: bridge
+  nextjs-app:
+    container_name: "frontend"
+    build: # build if image not exist
+      context: ${INTERFACE_SRC_DIR}
+      dockerfile: Dockerfile
+      args:
+        DOT_ENV_PRODUCTION_FILE: ${NEXTJS_DOT_ENV_PRODUCTION_FILE}
+    environment:
+      - NEXT_PUBLIC_BASE_API_URL=${NEXT_PUBLIC_BASE_API_URL}
+      - AUTH_URL=${AUTH_URL}
+    ports:
+      - "${NEXTJS_APP_PORT}:3000"
 
-volumes:
-  postgres:
+  proxy:
+    container_name: nginx
+    image: nginx:stable
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80"
